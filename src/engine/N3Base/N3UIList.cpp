@@ -6,6 +6,7 @@
 #include "N3UIList.h"
 #include "N3UIString.h"
 #include "N3UIScrollBar.h"
+#include "N3UITooltip.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -14,10 +15,10 @@
 CN3UIList::CN3UIList() {
     m_eType = UI_TYPE_LIST;
 
-    m_iCurSel = 0; // ÇöÀç ¼±ÅÃ..
+    m_iCurSel = 0; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½..
     m_pScrollBarRef = NULL;
 
-    m_szFontName = "±¼¸²Ã¼";
+    m_szFontName = "ï¿½ï¿½ï¿½ï¿½Ã¼";
     m_dwFontHeight = 10;
     m_bFontBold = FALSE;
     m_bFontItalic = FALSE;
@@ -35,15 +36,22 @@ void CN3UIList::Release() {
     //        delete (*it);
     //    }
 
-    m_ListString.clear(); // ¾îÂ÷ÇÇ ÀÚ½ÄÀº ´ÙÁö¿ì´Ï±î... ¸®½ºÆ®ÀÇ Æ÷ÀÎÅÍ¸¦ Delete ÇÒ ÇÊ¿ä ¾ø´Ù..
+    m_ListString.clear(); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ú½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï±ï¿½... ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Í¸ï¿½ Delete ï¿½ï¿½ ï¿½Ê¿ï¿½ ï¿½ï¿½ï¿½ï¿½..
     m_iCurSel = 0;
     m_pScrollBarRef = NULL;
 
-    m_szFontName = "±¼¸²Ã¼";
+    m_szFontName = "ï¿½ï¿½ï¿½ï¿½Ã¼";
     m_dwFontHeight = 10;
     m_bFontBold = FALSE;
     m_bFontItalic = FALSE;
     m_crFont = 0xffffffff;
+}
+
+void CN3UIList::SetScrollBarRef(CN3UIScrollBar * pScrollBarRef) {
+    m_pScrollBarRef = pScrollBarRef;
+    if (m_pScrollBarRef) {
+        m_pScrollBarRef->SetCurrentPos(0);
+    }
 }
 
 void CN3UIList::SetFont(const std::string & szFontName, DWORD dwHeight, BOOL bBold, BOOL bItalic) {
@@ -96,12 +104,30 @@ int CN3UIList::AddStrings(const std::string * pszStrings, int iStringCount) {
     return m_ListString.size() - 1;
 }
 
+int CN3UIList::AddStringTooltip(const std::string & szString, const D3DCOLOR szStringColor, const std::string & szStringToolTip, const D3DCOLOR szStringToolTipColor) {
+    CN3UIString * pString = new CN3UIString();
+    pString->Init(this);
+    pString->SetFont(m_szFontName, m_dwFontHeight, m_bFontBold, m_bFontItalic);
+    pString->SetColor(szStringColor);
+    pString->SetString(szString);
+
+    pString->SetTooltipText(szStringToolTip.c_str());
+    pString->m_crToolTipColor = szStringToolTipColor;
+
+    m_ListString.push_back(pString);
+    this->UpdateChildRegions();
+
+    return m_ListString.size() - 1;
+}
+
+
 int CN3UIList::AddString(const std::string & szString) {
     CN3UIString * pString = new CN3UIString();
     pString->Init(this);
     pString->SetFont(m_szFontName, m_dwFontHeight, m_bFontBold, m_bFontItalic);
     pString->SetColor(m_crFont);
     pString->SetString(szString);
+    
 
     m_ListString.push_back(pString);
     this->UpdateChildRegions();
@@ -137,11 +163,9 @@ bool CN3UIList::DeleteString(int iIndex) {
     }
 
     it_pString it = m_ListString.begin();
-    for (int i = 0; i < iIndex; it++) {
-        ;
-    }
+    std::advance(it, iIndex);
 
-    delete (*it);
+    delete *it;
     m_ListString.erase(it);
 
     int iSC = m_ListString.size();
@@ -195,11 +219,11 @@ bool CN3UIList::SetString(int iIndex, const std::string & szString) {
     return false;
 }
 
-CN3UIString * CN3UIList::GetChildStrFromList(std::string str) {
-    for (std::list<CN3UIString *>::iterator it = m_ListString.begin(); it != m_ListString.end(); ++it) {
-        CN3UIString * pUIString = (*it);
-        if (pUIString->GetString() == str) {
-            return pUIString;
+CN3UIString * CN3UIList::GetChildStrFromList(const std::string str) {
+
+    for (CN3UIString * pString : m_ListString) {
+        if (pString->GetString() == str) {
+            return pString;
         }
     }
 
@@ -213,7 +237,7 @@ void CN3UIList::UpdateChildRegions() {
     SIZE  size;
     int   iScrollPos = 0;
     if (m_pScrollBarRef) {
-        m_pScrollBarRef->GetCurrentPos();
+        iScrollPos = m_pScrollBarRef->GetCurrentPos(); 
         RECT rcTmp = m_pScrollBarRef->GetRegion();
         rc.right = rcTmp.left;
     }
@@ -241,14 +265,13 @@ void CN3UIList::UpdateChildRegions() {
     }
 
     if (m_pScrollBarRef) {
-        if (rc.bottom <= rcThis.bottom) {
-            m_pScrollBarRef->SetCurrentPos(0);
-            m_pScrollBarRef->SetVisibleWithNoSound(false);
+        if (rc.top <= rcThis.bottom) {
+            //m_pScrollBarRef->SetCurrentPos(0);
+            //m_pScrollBarRef->SetVisibleWithNoSound(false);
         } else {
             m_pScrollBarRef->SetVisibleWithNoSound(true);
         }
-
-        m_pScrollBarRef->SetRange(0, m_ListString.size());
+        //m_pScrollBarRef->SetRange(0, m_ListString.size());
     }
 }
 
@@ -273,10 +296,10 @@ bool CN3UIList::SetScrollPos(int iScrollPos) {
 bool CN3UIList::Load(HANDLE hFile) {
     bool bSuccess = CN3UIBase::Load(hFile);
 
-    // font Á¤º¸
+    // font ï¿½ï¿½ï¿½ï¿½
     DWORD dwNum;
     int   iStrLen = 0;
-    ReadFile(hFile, &iStrLen, sizeof(iStrLen), &dwNum, NULL); // font ÀÌ¸§ ±æÀÌ
+    ReadFile(hFile, &iStrLen, sizeof(iStrLen), &dwNum, NULL); // font ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½
     __ASSERT(iStrLen > 0, "No font name");
     if (iStrLen > 0) {
         m_szFontName.assign(iStrLen, ' ');
@@ -287,7 +310,8 @@ bool CN3UIList::Load(HANDLE hFile) {
         ReadFile(hFile, &m_bFontItalic, 4, &dwNum, NULL);           // font flag (bold, italic)
     }
 
-    // Child Áß¿¡ Scroll Bar °¡ ÀÖ´ÂÁö Ã£¾Æº»´Ù.
+    // Child ï¿½ß¿ï¿½ Scroll Bar ï¿½ï¿½ ï¿½Ö´ï¿½ï¿½ï¿½ Ã£ï¿½Æºï¿½ï¿½ï¿½.
+    
     for (UIListItor itor = m_Children.begin(); m_Children.end() != itor; ++itor) {
         CN3UIBase * pUI = *itor;
         if (pUI->UIType() == UI_TYPE_SCROLLBAR) {
@@ -299,13 +323,13 @@ bool CN3UIList::Load(HANDLE hFile) {
         //            if(    pString->GetFontName != m_szFontName ||
         //                pString->GetFontHeight() != m_dwFontHeight ||
         //                m_bFontBold != (pString->GetFontFlags() & D3DFONT_BOLD) ||
-        //                m_bFontItalic != (pString->GetFontFlags() & D3DFONT_ITALIC) ) // ÆùÆ®°¡ ´Ù¸£¸é.. Àû¿ë
+        //                m_bFontItalic != (pString->GetFontFlags() & D3DFONT_ITALIC) ) // ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½Ù¸ï¿½ï¿½ï¿½.. ï¿½ï¿½ï¿½ï¿½
         //            {
         //                pString->SetFont(m_szFontName, m_dwFontHeight, m_bFontBold, m_bFontItalic);
         //            }
         //        }
     }
-
+  
     return bSuccess;
 }
 
@@ -317,10 +341,10 @@ bool CN3UIList::Save(HANDLE hFile) {
 
     DWORD dwNum;
 
-    // font Á¤º¸
+    // font ï¿½ï¿½ï¿½ï¿½
     int iStrLen = m_szFontName.size();
     __ASSERT(iStrLen > 0, "No font name");
-    WriteFile(hFile, &iStrLen, sizeof(iStrLen), &dwNum, NULL); // font ÀÌ¸§ ±æÀÌ
+    WriteFile(hFile, &iStrLen, sizeof(iStrLen), &dwNum, NULL); // font ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½
     if (iStrLen > 0) {
         WriteFile(hFile, m_szFontName.c_str(), iStrLen, &dwNum, NULL); // string
         WriteFile(hFile, &m_dwFontHeight, 4, &dwNum, NULL);            // font height
@@ -351,15 +375,14 @@ DWORD CN3UIList::MouseProc(DWORD dwFlags, const POINT & ptCur, const POINT & ptO
         return dwRet;
     }
 
-    // Æ¯Á¤ ÀÌº¥Æ®¿¡ ´ëÇØ ¸Þ½ÃÁö Àü¼Û..
-    if (IsIn(ptCur.x, ptCur.y) && ((dwFlags & UI_MOUSE_LBCLICK) || (dwFlags & UI_MOUSE_LBDBLCLK))) {
+    if (IsIn(ptCur.x, ptCur.y)) {
         RECT rc = this->GetRegion(), rcStr;
         SIZE size;
 
         it_pString it = m_ListString.begin(), itEnd = m_ListString.end();
         for (int i = 0; it != itEnd; it++, i++) {
             CN3UIString * pStr = (*it);
-            if (false == pStr->IsVisible()) {
+            if (!pStr->IsVisible()) {
                 continue;
             }
 
@@ -370,20 +393,28 @@ DWORD CN3UIList::MouseProc(DWORD dwFlags, const POINT & ptCur, const POINT & ptO
             rc.bottom += size.cy;
 
             if (::PtInRect(&rcStr, ptCur)) {
-                m_iCurSel = i;
+                if (!pStr->m_szToolTip.empty()) {
+                    pStr->GetTooltipCtrl()->SetSingleLineText(pStr->m_szToolTip);
+                    pStr->GetTooltipCtrl()->SetColor(pStr->m_crToolTipColor);
+                }
+
                 if (dwFlags & UI_MOUSE_LBCLICK) {
+                    m_iCurSel = i;
                     if (m_pParent) {
-                        m_pParent->ReceiveMessage(this, UIMSG_LIST_SELCHANGE); // ºÎ¸ð¿¡°Ô ¹öÆ° Å¬¸¯ ÅëÁö..
+                        m_pParent->ReceiveMessage(this, UIMSG_LIST_SELCHANGE);
                     }
                     dwRet |= UIMSG_LIST_SELCHANGE;
-                } else {
+                    dwRet |= UI_MOUSEPROC_DONESOMETHING;
+                    return dwRet;
+                } else if (dwFlags & UI_MOUSE_LBDBLCLK) {
+                    m_iCurSel = i;
                     if (m_pParent) {
-                        m_pParent->ReceiveMessage(this, UIMSG_LIST_DBLCLK); // ºÎ¸ð¿¡°Ô ¹öÆ° Å¬¸¯ ÅëÁö..
+                        m_pParent->ReceiveMessage(this, UIMSG_LIST_DBLCLK);
                     }
                     dwRet |= UIMSG_LIST_DBLCLK;
+                    dwRet |= UI_MOUSEPROC_DONESOMETHING;
+                    return dwRet;
                 }
-                dwRet |= UI_MOUSEPROC_DONESOMETHING;
-                return dwRet;
             }
         }
     }
@@ -391,7 +422,6 @@ DWORD CN3UIList::MouseProc(DWORD dwFlags, const POINT & ptCur, const POINT & ptO
     dwRet |= CN3UIBase::MouseProc(dwFlags, ptCur, ptOld);
     return dwRet;
 }
-
 void CN3UIList::Render() {
     CN3UIBase::Render();
 
@@ -402,7 +432,7 @@ void CN3UIList::Render() {
         }
         CN3UIString * pStr = *it;
         if (pStr) {
-            RECT rc = pStr->GetRegion(); // ¼±ÅÃ Ç¥½Ã
+            RECT rc = pStr->GetRegion(); // ï¿½ï¿½ï¿½ï¿½ Ç¥ï¿½ï¿½
 
             __VertexTransformedColor vLines[5];
             vLines[0].Set(rc.left, rc.top, UI_DEFAULT_Z, UI_DEFAULT_RHW, 0xff00ff00);
@@ -454,7 +484,7 @@ bool CN3UIList::ReceiveMessage(CN3UIBase * pSender, DWORD dwMsg) {
     if (UIMSG_SCROLLBAR_POS == dwMsg) {
         if (pSender == m_pScrollBarRef) {
             this->SetScrollPos(m_pScrollBarRef->GetCurrentPos());
-            //            return m_pParent->ReceiveMessage(this, UIMSG_SCROLLBAR_POS);
+            return m_pParent->ReceiveMessage(this, UIMSG_SCROLLBAR_POS);
         }
     }
 
